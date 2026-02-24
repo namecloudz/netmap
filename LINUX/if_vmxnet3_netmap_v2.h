@@ -220,7 +220,7 @@ vmxnet3_netmap_rxsync(struct netmap_kring *kring, int flags)
 	u_int const lim  = kring->nkr_num_slots - 1;
 	u_int const head = kring->rhead;
 	int force_update =
-	        (flags & NAF_FORCE_READ) || kring->nr_kflags & NKR_PENDINTR;
+	        (flags & NAF_FORCE_READ) || (kring->nr_kflags & NKR_PENDINTR);
 
 	struct Vmxnet3_RxCompDesc *rcd;
 	struct SOFTC_T *adapter     = netdev_priv(ifp);

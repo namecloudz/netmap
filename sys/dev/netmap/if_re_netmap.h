@@ -178,7 +178,7 @@ re_netmap_rxsync(struct netmap_kring *kring, int flags)
 	u_int nic_i;	/* index into the NIC ring */
 	u_int const lim = kring->nkr_num_slots - 1;
 	u_int const head = kring->rhead;
-	int force_update = (flags & NAF_FORCE_READ) || kring->nr_kflags & NKR_PENDINTR;
+	int force_update = (flags & NAF_FORCE_READ) || (kring->nr_kflags & NKR_PENDINTR);
 
 	/* device-specific */
 	struct rl_softc *sc = if_getsoftc(ifp);

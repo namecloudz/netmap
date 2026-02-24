@@ -74,7 +74,7 @@ void *
 nm_os_malloc(size_t size)
 {
 	void *rv = kmalloc(size, GFP_ATOMIC | __GFP_ZERO);
-	if (IS_ERR(rv))
+	if (!rv)
 		return NULL;
 	return rv;
 }
@@ -83,7 +83,7 @@ void *
 nm_os_vmalloc(size_t size)
 {
 	void *rv = vmalloc(size);
-	if (IS_ERR(rv))
+	if (!rv)
 		return NULL;
 	return rv;
 }
@@ -94,7 +94,7 @@ nm_os_realloc(void *addr, size_t new_size, size_t old_size)
 	void *rv;
 	(void)old_size;
 	rv = krealloc(addr, new_size, GFP_ATOMIC | __GFP_ZERO);
-	if (IS_ERR(rv))
+	if (!rv)
 		return NULL;
 	return rv;
 }

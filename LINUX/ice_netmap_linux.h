@@ -122,15 +122,9 @@ ice_netmap_txsync(struct netmap_kring *kring, int flags)
 			NM_CHECK_ADDR_LEN_OFF(na, len, offset);
 
 			if (!(slot->flags & NS_MOREFRAG)) {
-				hw_flags |= ((u64)(ICE_TX_DESC_CMD_EOP) <<
+				hw_flags |= ((u64)(ICE_TX_DESC_CMD_EOP | ICE_TX_DESC_CMD_RS) <<
 						ICE_TXD_QW1_CMD_S);
-				//if (slot->flags & NS_REPORT || nic_i == 0 ||
-				//		nic_i == report_frequency) {
-				//	hw_flags |= ((u64)ICE_TX_DESC_CMD_RS <<
-				//			ICE_TXD_QW1_CMD_S);
-				//}
 			}
-			hw_flags |= ((u64)ICE_TX_DESC_CMD_RS << ICE_TXD_QW1_CMD_S);
 			if (slot->flags & NS_BUF_CHANGED) {
 				/* buffer has changed, reload map */
 				//netmap_reload_map(na, txr->dma.tag, txbuf->map, addr);
@@ -218,7 +212,7 @@ ice_netmap_rxsync(struct netmap_kring *kring, int flags)
 	u_int n;
 	u_int const lim = kring->nkr_num_slots - 1;
 	u_int const head = kring->rhead;
-	int force_update = (flags & NAF_FORCE_READ) || kring->nr_kflags & NKR_PENDINTR;
+	int force_update = (flags & NAF_FORCE_READ) || (kring->nr_kflags & NKR_PENDINTR);
 
 	/* device-specific */
 	struct ice_netdev_priv *np = netdev_priv(ifp);
@@ -512,7 +506,7 @@ ice_netmap_configure_tx_ring(struct NM_ICE_TXRING *ring)
 	struct netmap_adapter *na;
 
 	if (!ring->netdev) {
-		// XXX it this possible?
+		// XXX is this possible?
 		return;
 	}
 
@@ -528,7 +522,7 @@ ice_netmap_preconfigure_rx_ring(struct NM_ICE_RXRING *ring,
 	struct netmap_kring *kring;
 
 	if (!ring->netdev) {
-		// XXX it this possible?
+		// XXX is this possible?
 		return;
 	}
 
@@ -550,7 +544,7 @@ ice_netmap_configure_rx_ring(struct NM_ICE_RXRING *ring)
 	int lim, i, ring_nr;
 
 	if (!ring->netdev) {
-		// XXX it this possible?
+		// XXX is this possible?
 		return 0;
 	}
 
