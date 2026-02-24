@@ -52,6 +52,17 @@ codebases are mostly aligned.
 - Improved Debian compatibility for Intel drivers
 
 ### Bug Fixes
+- **Fix: operator precedence in rxsync `force_update`** — `||` has higher precedence
+  than `&`, causing `force_update` to always be true when `nr_kflags != 0`.
+  Fixed in 20 driver netmap headers across Linux and BSD.
+- **Fix: `IS_ERR()` → `!rv`** in `netmap_linux.c` — `kmalloc`/`vmalloc`/`krealloc`
+  return `NULL` on failure, not `ERR_PTR()`.
+- **Fix: RS bit on every TX descriptor** in `ice_netmap_linux.h` — RS was set on
+  every descriptor causing excessive interrupts. Now only set on EOP descriptors.
+- **Fix: `intel_driver` macro zip → tar.gz** — `unzip` is not always available on
+  minimal Ubuntu/Debian servers. Changed to `tar.gz` which uses `tar` (always available).
+- **Fix: ice 2.2.9 patch `#endif` bug** — Patch accidentally removed
+  `#endif /* CONFIG_NET_DEVLINK */` causing unterminated `#if` compilation error.
 - Fixed alignment in krings creation
 - Fixed kernel oops in veth multiqueue mode
 - Fixed ice driver: removed spurious hooks, fixed `vsi->rx_buf_len` access
@@ -155,32 +166,6 @@ If you need the netmap enabled drivers for e1000, veth, forcedeth,
 virtio-net or r8169 you will also need the full kernel sources.
 
 **Supported kernel versions**: Linux 3.x through 6.x (tested up to 6.19).
-
-### Changelog (namecloudz fork)
-
-#### 2026-02-25
-**Bug fixes (code audit)**:
-- **Fix: operator precedence in rxsync `force_update`** — `||` has higher precedence
-  than `&`, causing `force_update` to be always true when `nr_kflags != 0`.
-  Fixed in 20 driver netmap headers: `ice`, `i40e`, `ixgbe`, `igb`, `igc`, `e1000`,
-  `e1000e`, `virtio`, `vmxnet3` ×2, `stmmac`, `re`, `forcedeth`, `netmap_generic.c`,
-  `ixgbe_netmap.h`, `if_re_netmap.h`, `if_lem_netmap.h`, `if_ixl_netmap.h`,
-  `if_igb_netmap.h`, `if_em_netmap.h`.
-- **Fix: `IS_ERR()` → `!rv`** in `netmap_linux.c` — `kmalloc`/`vmalloc`/`krealloc`
-  return `NULL` on failure, not `ERR_PTR()`.
-- **Fix: RS bit on every TX descriptor** in `ice_netmap_linux.h` — RS (Report Status)
-  was set on every descriptor causing excessive completion interrupts. Now only set
-  on EOP descriptors.
-
-#### 2026-02-24
-**Build system and driver updates**:
-- **Fix: `intel_driver` macro zip → tar.gz** — `unzip` is not installed on minimal
-  Ubuntu/Debian servers. Changed GitHub download format from `.zip` (requires `unzip`)
-  to `.tar.gz` (uses `tar`, always available on Linux).
-- **Fix: ice 2.2.9 patch `#endif` bug** — Patch accidentally removed
-  `#endif /* CONFIG_NET_DEVLINK */` causing `unterminated #if` compilation error.
-- **Bump default driver versions**: ixgbe 5.15.2→6.1.6, ixgbevf 4.15.1→5.1.5,
-  igb 5.10.2→5.19.4, i40e 2.19.3→2.28.9, ice 1.9.11→2.2.9.
 
 **Modern kernel compatibility notes**:
 - Kernel 5.8+: `mmap_sem` → `mmap_lock` handled automatically
