@@ -594,6 +594,20 @@ void netmap_bns_unregister(void);
 #define NM_NETIF_NAPI_ADD	netif_napi_add
 #endif /* NETMAP_LINUX_HAVE_NAPI_POLL_WEIGHT */
 
+/* mmap_sem was renamed to mmap_lock in kernel 5.8 */
+#ifdef NETMAP_LINUX_HAVE_MMAP_LOCK
+#define nm_mmap_read_lock(mm)	mmap_read_lock(mm)
+#define nm_mmap_read_unlock(mm)	mmap_read_unlock(mm)
+#else
+#define nm_mmap_read_lock(mm)	down_read(&(mm)->mmap_sem)
+#define nm_mmap_read_unlock(mm)	up_read(&(mm)->mmap_sem)
+#endif /* NETMAP_LINUX_HAVE_MMAP_LOCK */
+
+/* ioremap_cache was removed in kernel 6.5+ */
+#ifndef NETMAP_LINUX_HAVE_IOREMAP_CACHE
+#define ioremap_cache	ioremap
+#endif /* NETMAP_LINUX_HAVE_IOREMAP_CACHE */
+
 #ifdef NETMAP_LINUX_HAVE_DEV_ADDR_SET
 #define NM_DEV_ADDR_SET(a_, m_)	dev_addr_set(a_, m_)
 #else
@@ -609,5 +623,25 @@ void netmap_bns_unregister(void);
 #else
 #define NM_EVENTFD_SIGNAL	eventfd_signal
 #endif /* NETMAP_LINUX_HAVE_EVENTFD_SIG_2ARGS */
+
+/* ndo_select_queue: handle signature differences across kernel versions.
+ * Kernel 6.0+ uses 3 args without select_queue_fallback_t.
+ * Kernel 5.x uses 4 args with select_queue_fallback_t.
+ * Kernel 4.x uses 4 args with void* accel_priv + fallback.
+ * Kernel 3.x uses 3 args with void* accel_priv.
+ */
+#ifdef NETMAP_LINUX_SELECT_QUEUE_3ARGS_NOFALLBACK
+#define NETMAP_LINUX_SELECT_QUEUE_ARGS \
+	, struct net_device *sb_dev
+#elif NETMAP_LINUX_SELECT_QUEUE >= 4
+#define NETMAP_LINUX_SELECT_QUEUE_ARGS \
+	, NETMAP_LINUX_SELECT_QUEUE_PARM3 accel_priv \
+	, select_queue_fallback_t fallback
+#elif NETMAP_LINUX_SELECT_QUEUE >= 3
+#define NETMAP_LINUX_SELECT_QUEUE_ARGS \
+	, NETMAP_LINUX_SELECT_QUEUE_PARM3 accel_priv
+#else
+#define NETMAP_LINUX_SELECT_QUEUE_ARGS
+#endif
 
 #endif /* NETMAP_BSD_GLUE_H */

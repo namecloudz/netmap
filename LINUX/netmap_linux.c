@@ -319,7 +319,7 @@ nm_os_extmem_create(unsigned long p, struct nmreq_pools_info *pi, int *perror)
 			0, /* don't force */
 			pages);
 #else
-	down_read(&current->mm->mmap_sem);
+	nm_mmap_read_lock(current->mm);
 	res = get_user_pages(
 			current,
 			current->mm,
@@ -329,7 +329,7 @@ nm_os_extmem_create(unsigned long p, struct nmreq_pools_info *pi, int *perror)
 			0, /* don't force */
 			pages,
 			NULL);
-	up_read(&current->mm->mmap_sem);
+	nm_mmap_read_unlock(current->mm);
 #endif	/* NETMAP_LINUX_GUP */
 
 	e->nr_pages = res;
@@ -664,12 +664,7 @@ nm_os_catch_rx(struct netmap_generic_adapter *gna, int intercept)
 #ifdef NETMAP_LINUX_SELECT_QUEUE
 static u16
 generic_ndo_select_queue(struct ifnet *ifp, struct mbuf *m
-#if NETMAP_LINUX_SELECT_QUEUE >= 3
-			, NETMAP_LINUX_SELECT_QUEUE_PARM3 accel_priv
-#if NETMAP_LINUX_SELECT_QUEUE >= 4
-				, select_queue_fallback_t fallback
-#endif /* >= 4 */
-#endif /* >= 3 */
+			NETMAP_LINUX_SELECT_QUEUE_ARGS
 		)
 {
 	return skb_get_queue_mapping(m); // actually 0 on 2.6.23 and before
@@ -1741,13 +1736,15 @@ static int
 nm_kctx_worker(void *data)
 {
 	struct nm_kctx *nmk = data;
-#ifndef NETMAP_LINUX_HAVE_KTHREAD_USE_MM
+#if !defined(NETMAP_LINUX_HAVE_KTHREAD_USE_MM) && defined(NETMAP_LINUX_HAVE_SET_FS)
 	mm_segment_t oldfs = get_fs();
-#endif /* NETMAP_LINUX_HAVE_KTHREAD_USE_MM */
+#endif /* !NETMAP_LINUX_HAVE_KTHREAD_USE_MM && NETMAP_LINUX_HAVE_SET_FS */
 
 	if (nmk->mm) {
 #ifndef NETMAP_LINUX_HAVE_KTHREAD_USE_MM
+#ifdef NETMAP_LINUX_HAVE_SET_FS
 		set_fs(USER_DS);
+#endif /* NETMAP_LINUX_HAVE_SET_FS */
 		use_mm(nmk->mm);
 #else
 		kthread_use_mm(nmk->mm);
@@ -1768,9 +1765,9 @@ nm_kctx_worker(void *data)
 #endif /* NETMAP_LINUX_HAVE_KTHREAD_USE_MM */
 	}
 
-#ifndef NETMAP_LINUX_HAVE_KTHREAD_USE_MM
+#if !defined(NETMAP_LINUX_HAVE_KTHREAD_USE_MM) && defined(NETMAP_LINUX_HAVE_SET_FS)
 	set_fs(oldfs);
-#endif /* NETMAP_LINUX_HAVE_KTHREAD_USE_MM */
+#endif /* !NETMAP_LINUX_HAVE_KTHREAD_USE_MM && NETMAP_LINUX_HAVE_SET_FS */
 	return 0;
 }
 

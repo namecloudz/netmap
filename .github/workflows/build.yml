@@ -1,0 +1,102 @@
+name: Build Netmap
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-local:
+    runs-on: ubuntu-latest
+    name: Build (local kernel, no drivers)
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y linux-headers-$(uname -r) libelf-dev
+      - name: Configure (no drivers)
+        working-directory: LINUX
+        run: ./configure --no-drivers
+      - name: Build
+        working-directory: LINUX
+        run: make -j$(nproc)
+
+  build-kernel:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kernel: "5.10.228"
+            arch: x86_64
+          - kernel: "5.15.170"
+            arch: x86_64
+          - kernel: "6.1.120"
+            arch: x86_64
+          - kernel: "6.6.69"
+            arch: x86_64
+          - kernel: "6.8.12"
+            arch: x86_64
+          - kernel: "6.12.8"
+            arch: x86_64
+    name: Build (kernel ${{ matrix.kernel }})
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y libelf-dev bc flex bison
+      - name: Download and prepare kernel
+        run: |
+          MAJOR_VER=${KERNEL_VERSION:0:1}
+          wget -q https://www.kernel.org/pub/linux/kernel/v${MAJOR_VER}.x/linux-${KERNEL_VERSION}.tar.xz
+          tar xf linux-${KERNEL_VERSION}.tar.xz
+          cd linux-${KERNEL_VERSION}
+          make mrproper
+          make -j$(nproc) ARCH=${{ matrix.arch }} allmodconfig
+          make -j$(nproc) ARCH=${{ matrix.arch }} modules_prepare
+        env:
+          KERNEL_VERSION: ${{ matrix.kernel }}
+      - name: Configure netmap (no drivers)
+        working-directory: LINUX
+        run: ./configure --no-drivers --kernel-dir=${{ github.workspace }}/linux-${{ matrix.kernel }}
+      - name: Build netmap
+        working-directory: LINUX
+        run: make -j$(nproc)
+
+  build-drivers:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - kernel: "6.1.120"
+            drivers: "e1000e,igb,ixgbe,i40e,ice"
+          - kernel: "6.6.69"
+            drivers: "e1000e,igb,ixgbe,i40e,ice"
+    name: Build drivers (${{ matrix.kernel }})
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get install -y libelf-dev bc flex bison
+      - name: Download and prepare kernel
+        run: |
+          MAJOR_VER=${KERNEL_VERSION:0:1}
+          wget -q https://www.kernel.org/pub/linux/kernel/v${MAJOR_VER}.x/linux-${KERNEL_VERSION}.tar.xz
+          tar xf linux-${KERNEL_VERSION}.tar.xz
+          cd linux-${KERNEL_VERSION}
+          make mrproper
+          make -j$(nproc) allmodconfig
+          make -j$(nproc) modules_prepare
+        env:
+          KERNEL_VERSION: ${{ matrix.kernel }}
+      - name: Configure with drivers
+        working-directory: LINUX
+        run: ./configure --driver-suffix=_netmap --kernel-dir=${{ github.workspace }}/linux-${{ matrix.kernel }} --drivers=${{ matrix.drivers }}
+      - name: Build
+        working-directory: LINUX
+        run: make -j$(nproc)

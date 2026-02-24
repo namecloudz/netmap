@@ -61,9 +61,14 @@ if [ ${KERNEL_VERSION} == "local" ]; then
     exit 0
 fi
 
-# Fetch the kernel code
-wget https://www.kernel.org/pub/linux/kernel/v${KERNEL_VERSION:0:1}.x/linux-${KERNEL_VERSION}.tar.gz
-tar xzf linux-${KERNEL_VERSION}.tar.gz
+# Fetch the kernel code - use xz for 4.x+ or gz for older
+if [ $(echo "${KERNEL_VERSION}" | cut -d. -f1) -ge 4 ]; then
+    SUFFIX="xz"
+else
+    SUFFIX="gz"
+fi
+wget -q https://www.kernel.org/pub/linux/kernel/v${KERNEL_VERSION:0:1}.x/linux-${KERNEL_VERSION}.tar.${SUFFIX}
+tar xf linux-${KERNEL_VERSION}.tar.${SUFFIX}
 
 # Configure kernel
 pushd linux-${KERNEL_VERSION}
@@ -94,16 +99,38 @@ make -j $PROC_COUNT
 make distclean
 echo "Building external intel drivers (and virtio_net.c)"
 EXTDRIVERS="e1000e,igb,ixgbe,i40e"
+
 # For kernels >= 3.13 we support virtio_net.c as an external driver
 cmp=$(kverless $KERNEL_VERSION 3.10)
 if [ "$cmp" == "1" ]; then
 	EXTDRIVERS="${EXTDRIVERS},virtio_net.c"
 fi
+
+# For kernels >= 5.5 we also support ice
+cmp=$(kverless $KERNEL_VERSION 5.5)
+if [ "$cmp" == "1" ]; then
+	EXTDRIVERS="${EXTDRIVERS},ice"
+fi
+
 ./configure --kernel-dir=$PWD/linux-${KERNEL_VERSION} --driver-suffix=_netmap --drivers=${EXTDRIVERS}
 make -j $PROC_COUNT
 
 # Then build vanilla intel drivers
 make distclean
 echo "Building vanilla intel drivers"
-./configure --no-ext-drivers --kernel-dir=$PWD/linux-${KERNEL_VERSION} --driver-suffix=_netmap --drivers=e1000e,igb,ixgbe,i40e
+VANDRIVERS="e1000e,igb,ixgbe,i40e"
+
+# ice supported for kernel >= 5.5
+cmp=$(kverless $KERNEL_VERSION 5.5)
+if [ "$cmp" == "1" ]; then
+	VANDRIVERS="${VANDRIVERS},ice"
+fi
+
+# igc supported for kernel >= 4.20
+cmp=$(kverless $KERNEL_VERSION 4.20)
+if [ "$cmp" == "1" ]; then
+	VANDRIVERS="${VANDRIVERS},igc"
+fi
+
+./configure --no-ext-drivers --kernel-dir=$PWD/linux-${KERNEL_VERSION} --driver-suffix=_netmap --drivers=${VANDRIVERS}
 make -j $PROC_COUNT

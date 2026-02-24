@@ -2021,6 +2021,88 @@ EOF
 	}
 EOF
 
+  # check for IFF_LLTX (6.12+: NETIF_F_LLTX replaced by IFF_LLTX priv flag)
+  add_test 'have IFF_LLTX' <<EOF
+	#include <linux/netdevice.h>
+
+	void dummy(struct net_device *dev) {
+		dev->lltx = true;
+	}
+EOF
+
+  # check for class_create with single argument (6.4+)
+  add_test 'have CLASS_CREATE_1ARG' <<EOF
+	#include <linux/device/class.h>
+
+	struct class *dummy(void) {
+		return class_create("test");
+	}
+EOF
+
+  # check for ndo_select_queue with 3 args (no fallback) (6.0+)
+  add_test 'define SELECT_QUEUE_3ARGS_NOFALLBACK' <<EOF
+	#include <linux/netdevice.h>
+
+	static u16 myselect(struct net_device *dev, struct sk_buff *skb,
+		struct net_device *sb_dev)
+	{
+		(void)dev;
+		(void)skb;
+		(void)sb_dev;
+		return 0;
+	}
+	struct net_device_ops ndo = {
+		.ndo_select_queue = myselect,
+	};
+EOF
+
+  # check for mmap_lock API (5.8+: mmap_sem renamed to mmap_lock)
+  add_test 'have MMAP_LOCK' <<EOF
+	#include <linux/mm.h>
+
+	void dummy(struct mm_struct *mm) {
+		mmap_read_lock(mm);
+		mmap_read_unlock(mm);
+	}
+EOF
+
+  # check for ioremap (ioremap_cache removed in 6.5+)
+  add_test 'have IOREMAP_CACHE' <<EOF
+	#include <linux/io.h>
+
+	void __iomem *dummy(phys_addr_t offset, size_t size) {
+		return ioremap_cache(offset, size);
+	}
+EOF
+
+  # check for get_fs/set_fs availability (removed in 5.18+ for some arches)
+  add_test 'have SET_FS' <<EOF
+	#include <linux/uaccess.h>
+
+	void dummy(void) {
+		mm_segment_t old = get_fs();
+		set_fs(old);
+	}
+EOF
+
+  # check for napi_build_skb()
+  add_test 'have NAPI_BUILD_SKB' <<EOF
+	#include <linux/skbuff.h>
+
+	struct sk_buff *dummy(void *data, unsigned int frag_size) {
+		return napi_build_skb(data, frag_size);
+	}
+EOF
+
+  # check for xdp_do_flush (replaces xdp_do_flush_map)
+  add_test 'have XDP_DO_FLUSH' <<EOF
+	#include <linux/filter.h>
+
+	void dummy(void) {
+		xdp_do_flush();
+	}
+EOF
+
   #####################################################
   # checks related to drivers                         #
   #####################################################

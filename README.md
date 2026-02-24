@@ -1,4 +1,4 @@
-# Netmap: a framework for fast packet I/O
+# Netmap: a framework for fast packet I/O (Modernized Fork)
 
 ## Introduction
 
@@ -21,6 +21,12 @@ Netmap, VALE and related applications are already included in FreeBSD
 since version 10.x. FreeBSD users should use the code included in the
 FreeBSD src tree rather than the one in this repository, although the two
 codebases are mostly aligned.
+
+> **Note**: This is a modernized fork of the original
+> [luigirizzo/netmap](https://github.com/luigirizzo/netmap) project.
+> It has been updated to support modern Linux kernels (5.x, 6.x) and
+> includes fixes for various kernel API changes that were introduced
+> after the original project became less actively maintained.
 
 ## Why should I use netmap?
 
@@ -79,7 +85,9 @@ the VALE switch and access to physical NICS using unmodified device drivers
 
 Netmap-aware device drivers are needed to use netmap at high speed
 on ethernet ports.  To date, we have support for Intel ixgbe (10G),
-ixl (10/40G), e1000/e1000e/igb (1G), Realtek 8169 (1G) and Nvidia (1G).
+ixl/i40e (10/40G), ice (10/25/50/100G), igb/igc (1/2.5G), e1000/e1000e (1G),
+Realtek 8169 (1G), Nvidia (1G), Mellanox mlx5 (10/25/40/50/100G),
+VirtIO, VMware vmxnet3, and STMicroelectronics stmmac.
 FreeBSD has also native netmap support in the Chelsio 10/40G cards.
 
 ### FreeBSD
@@ -102,10 +110,21 @@ some netmap-enabled device drivers.
 Please look [here](LINUX/README.md) for more instructions.
 
 Make sure you have kernel headers matching your installed kernel.
-The sources for e1000e, igb, ixgbe and i40e will be downloaded
-from the Intel e1000 project on sourceforce.
+The sources for e1000e, igb, ixgbe, i40e and ice will be downloaded
+from the Intel driver project on sourceforge.
 If you need the netmap enabled drivers for e1000, veth, forcedeth,
 virtio-net or r8169 you will also need the full kernel sources.
+
+**Supported kernel versions**: Linux 3.x through 6.x (tested up to 6.12).
+
+**Modern kernel compatibility notes**:
+- Kernel 5.8+: `mmap_sem` → `mmap_lock` handled automatically
+- Kernel 5.18+: `get_fs()`/`set_fs()` removal handled automatically
+- Kernel 6.0+: `ndo_select_queue` signature changes handled automatically
+- Kernel 6.4+: `class_create()` single-arg handled automatically
+- Kernel 6.5+: `ioremap_cache` removal handled automatically
+- Kernel 6.12+: `NETIF_F_LLTX` → `IFF_LLTX` handled automatically
+- Kernel 6.12+: `hrtimer_setup()` API handled automatically
 
 Linux users can find the netmap example applications in the `apps/`
 directory in this repository.
