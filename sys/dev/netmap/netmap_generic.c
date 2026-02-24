@@ -706,12 +706,12 @@ generic_netmap_txsync(struct netmap_kring *kring, int flags)
 		while (nm_i != head) {
 			struct netmap_slot *slot = &ring->slot[nm_i];
 			uint64_t offset          = nm_get_offset(kring, slot);
-			__builtin_prefetch(&ring->slot[nm_next(nm_i, lim)]);
-			void *addr = NMB_O(kring, slot);
-			u_int len  = slot->len;
+			void *addr               = NMB_O(kring, slot);
+			u_int len                = slot->len;
 			/* device-specific */
 			struct mbuf *m;
 			int tx_ret;
+			__builtin_prefetch(&ring->slot[nm_next(nm_i, lim)]);
 
 			NM_CHECK_ADDR_LEN_OFF(na, len, offset);
 
@@ -1016,8 +1016,8 @@ generic_netmap_rxsync(struct netmap_kring *kring, int flags)
 		do {
 			struct netmap_slot *slot = ring->slot + nm_i;
 			uint64_t nm_offset       = nm_get_offset(kring, slot);
+			char *nmaddr             = NMB(na, slot);
 			__builtin_prefetch(ring->slot + nm_next(nm_i, lim));
-			char *nmaddr = NMB(na, slot);
 
 			if (nmaddr == NETMAP_BUF_BASE(na)) { /* Bad buffer */
 				m_freem(m);
