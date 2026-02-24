@@ -28,6 +28,45 @@ codebases are mostly aligned.
 > includes fixes for various kernel API changes that were introduced
 > after the original project became less actively maintained.
 
+## Changelog (Modernized Fork)
+
+### Kernel Compatibility
+- Added support for **Linux 6.12 – 6.19** kernels
+- `NETIF_F_LLTX` → `IFF_LLTX` migration (kernel 6.12+)
+- `hrtimer_setup()` API adaptation (kernel 6.12+)
+- `ioremap_cache` removal handled (kernel 6.5+)
+- `class_create()` single-arg handled (kernel 6.4+)
+- `ndo_select_queue` signature changes handled (kernel 6.0+)
+- `get_fs()`/`set_fs()` removal handled (kernel 5.18+)
+- `mmap_sem` → `mmap_lock` handled (kernel 5.8+)
+
+### Driver Updates
+- **Default driver versions bumped** to latest available:
+  - ixgbe: 5.15.2 → **6.1.6**
+  - ixgbevf: 4.15.1 → **5.1.5**
+  - igb: 5.10.2 → **5.19.4**
+  - i40e: 2.19.3 → **2.28.9**
+  - ice: 1.9.11 → **2.2.9**
+- Switched Intel driver downloads from SourceForge to **GitHub**
+- Added patches for latest Intel driver versions
+- Improved Debian compatibility for Intel drivers
+
+### Bug Fixes
+- Fixed alignment in krings creation
+- Fixed kernel oops in veth multiqueue mode
+- Fixed ice driver: removed spurious hooks, fixed `vsi->rx_buf_len` access
+- Fixed forcedeth compilation for kernel 6.14
+- Fixed ixgbe build test for recent kernels
+- Fixed possible out-of-bound write (generic)
+- Fixed ax25 pointer safety check
+- Fixed regression in build-tests for internal drivers
+
+### Build System
+- Use `ccflags-y` instead of `EXTRA_CFLAGS`
+- More precise test for `HRTIMER_MODE_REL`
+- Made driver tests depend on driver build
+- Reset `TESTPOSTPROC` between tests
+
 ## Why should I use netmap?
 
 Netmap is mostly useful for userspace applications that must deal with raw
