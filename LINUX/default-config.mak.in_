@@ -60,8 +60,8 @@
 # all the intel drivers are compiled in much the same way, so we factor them
 # here. $(1) is the driver name, while $(2) is the driver version
 define intel_driver
-$(1)@fetch	:= test -e @SRCDIR@/ext-drivers/$(1)/v$(2).zip || wget https://github.com/intel/ethernet-linux-$(1)/archive/refs/tags/v$(2).zip -P @SRCDIR@/ext-drivers/$(1)
-$(1)@src 	:= unzip -u @SRCDIR@/ext-drivers/$(1)/v$(2).zip && ln -s ethernet-linux-$(1)-$(2)/src $(1)
+$(1)@fetch	:= test -e @SRCDIR@/ext-drivers/$(1)/v$(2).tar.gz || wget https://github.com/intel/ethernet-linux-$(1)/archive/refs/tags/v$(2).tar.gz -P @SRCDIR@/ext-drivers/$(1)
+$(1)@src 	:= tar xzf @SRCDIR@/ext-drivers/$(1)/v$(2).tar.gz && ln -sf ethernet-linux-$(1)-$(2)/src $(1)
 $(1)@patch 	:= patches/intel--$(1)--$(2)
 $(1)@build 	 = make -C $(1) CFLAGS_EXTRA="$$($(1)@cflags) $(EXTRA_CFLAGS)" @KOPTS@ NETMAP_DRIVER_SUFFIX=@DRVSUFFIX@ KSRC=@SRC@ KBUILD_EXTRA_SYMBOLS=@BUILDDIR@/Module.symvers
 $(1)@install 	 = make -C $(1) install INSTALL_MOD_PATH=@MODPATH@ CFLAGS_EXTRA="$$($(1)@cflags) $(EXTRA_CFLAGS)" NETMAP_DRIVER_SUFFIX=@DRVSUFFIX@ KSRC=@SRC@ KBUILD_EXTRA_SYMBOLS=@BUILDDIR@/Module.symvers
