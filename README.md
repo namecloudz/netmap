@@ -71,6 +71,15 @@ codebases are mostly aligned.
 - Fixed possible out-of-bound write (generic)
 - Fixed ax25 pointer safety check
 - Fixed regression in build-tests for internal drivers
+- **Fix: `ax25_ptr` type compatibility** (GitHub [#972](https://github.com/luigirizzo/netmap/issues/972)/[#977](https://github.com/luigirizzo/netmap/issues/977)) —
+  `ax25_ptr` changed from `void*` to `struct ax25_dev*` in kernel 6.6.76+.
+  Added `(void*)` cast in `if_setnetmapadapter`.
+- **Fix: `strcpy` fortify_panic** (GitHub [#976](https://github.com/luigirizzo/netmap/issues/976)) —
+  Fortified kernels (`FORTIFY_SOURCE`) panic on `strcpy()` through `void*` arithmetic.
+  Replaced with `memcpy()` in `tc_configure()`.
+- **Fix: default pool sizes too small** (GitHub [#985](https://github.com/luigirizzo/netmap/issues/985)) —
+  `ring_num` 200→1024, `if_num` 100→200. Prevents exhaustion with many netmap
+  instances using pipes.
 
 ### Performance Optimizations
 - **`__builtin_prefetch` in all driver txsync/rxsync loops** — prefetch next netmap slot
