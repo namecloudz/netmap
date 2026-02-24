@@ -82,6 +82,9 @@ codebases are mostly aligned.
   instances using pipes.
 
 ### Performance Optimizations
+- **NUMA-aware buffer allocation** (GitHub [#984](https://github.com/luigirizzo/netmap/issues/984)) —
+  Buffers are now allocated on the same NUMA node as the NIC via `alloc_pages_node()`.
+  Reduces cross-socket memory latency on multi-socket servers (10-30% improvement).
 - **`__builtin_prefetch` in all driver txsync/rxsync loops** — prefetch next netmap slot
   and NIC descriptor in every hot loop. Applied to: ixgbe, igb, mlx5, e1000, e1000e, igc,
   re (Realtek), forcedeth (nVidia), stmmac (ARM), virtio-net, vmxnet3. (ice/i40e already had it)

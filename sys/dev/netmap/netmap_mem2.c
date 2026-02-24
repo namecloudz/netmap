@@ -69,6 +69,12 @@ MALLOC_DEFINE(M_NETMAP, "netmap", "Network memory map");
 #include <net/netmap_virt.h>
 #include "netmap_mem2.h"
 
+/* FreeBSD / non-Linux fallback: ignore NUMA node, use regular contigmalloc */
+#ifndef contigmalloc_node
+#define contigmalloc_node(sz, ty, flags, a, b, pgsz, c, node)                  \
+	contigmalloc(sz, ty, flags, a, b, pgsz, c)
+#endif
+
 #ifdef _WIN32_USE_SMALL_GENERIC_DEVICES_MEMORY
 #define NETMAP_BUF_MAX_NUM                                                     \
 	8 * 4096 /* if too big takes too much time to allocate */
@@ -171,6 +177,7 @@ struct netmap_mem_d {
 
 	nm_memid_t nm_id; /* allocator identifier */
 	int nm_grp;       /* iommu group id */
+	int numa_node;    /* NUMA node for allocations, -1 = any */
 
 	/* list of all existing allocators, sorted by nm_id */
 	struct netmap_mem_d *prev, *next;
@@ -360,6 +367,13 @@ netmap_mem_finalize(struct netmap_mem_d *nmd, struct netmap_adapter *na)
 	}
 
 	NMA_LOCK(nmd);
+
+	/* Set NUMA node from the NIC's PCI device for locality-aware
+	 * buffer allocation.  Only set once (first adapter). */
+#ifdef linux
+	if (nmd->numa_node < 0 && na->pdev != NULL)
+		nmd->numa_node = dev_to_node((struct device *)na->pdev);
+#endif
 
 	if (netmap_mem_config(nmd))
 		goto out;
@@ -1425,7 +1439,8 @@ netmap_config_obj_allocator(struct netmap_obj_pool *p, u_int objtotal,
 
 /* call with NMA_LOCK held */
 static int
-netmap_finalize_obj_allocator(struct netmap_obj_pool *p)
+netmap_finalize_obj_allocator(struct netmap_mem_d *nmd,
+                              struct netmap_obj_pool *p)
 {
 	int i; /* must be signed */
 	size_t n;
@@ -1468,8 +1483,9 @@ netmap_finalize_obj_allocator(struct netmap_obj_pool *p)
 		 * can live with standard malloc, because the hardware will not
 		 * access the pages directly.
 		 */
-		clust = contigmalloc(n, M_NETMAP, M_NOWAIT | M_ZERO, (size_t)0,
-		                     -1UL, PAGE_SIZE, 0);
+		clust =
+		    contigmalloc_node(n, M_NETMAP, M_NOWAIT | M_ZERO, (size_t)0,
+		                      -1UL, PAGE_SIZE, 0, nmd->numa_node);
 		if (clust == NULL) {
 			/*
 			 * If we get here, there is a severe memory shortage,
@@ -1668,7 +1684,8 @@ netmap_mem_finalize_all(struct netmap_mem_d *nmd)
 	nmd->lasterr      = 0;
 	nmd->nm_totalsize = 0;
 	for (i = 0; i < NETMAP_POOLS_NR; i++) {
-		nmd->lasterr = netmap_finalize_obj_allocator(&nmd->pools[i]);
+		nmd->lasterr =
+		    netmap_finalize_obj_allocator(nmd, &nmd->pools[i]);
 		if (nmd->lasterr)
 			goto error;
 		nmd->nm_totalsize += nmd->pools[i].memtotal;

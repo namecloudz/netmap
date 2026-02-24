@@ -476,6 +476,25 @@ ilog2(uint64_t n)
 		(p_ != NULL ? (char *)page_address(p_) : NULL);                \
 	})
 
+/*
+ * NUMA-aware variant of contigmalloc.
+ * Allocates physically contiguous pages on the specified NUMA node.
+ * Falls back to any-node allocation if node == NUMA_NO_NODE (-1).
+ */
+#define contigmalloc_node(sz, ty, flags, a, b, pgsz, c, node)                  \
+	({                                                                     \
+		unsigned int order_ =                                          \
+		    ilog2(roundup_pow_of_two(sz) / PAGE_SIZE);                 \
+		struct page *p_ =                                              \
+		    ((node) >= 0)                                              \
+		        ? alloc_pages_node((node), GFP_USER | __GFP_ZERO,      \
+		                           order_)                             \
+		        : alloc_pages(GFP_USER | __GFP_ZERO, order_);          \
+		if (p_ != NULL)                                                \
+			split_page(p_, order_);                                \
+		(p_ != NULL ? (char *)page_address(p_) : NULL);                \
+	})
+
 #define contigfree(va, sz, ty)                                                 \
 	do {                                                                   \
 		unsigned int npages_ = roundup_pow_of_two(sz) / PAGE_SIZE;     \
