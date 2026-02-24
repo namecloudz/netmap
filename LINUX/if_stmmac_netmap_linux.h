@@ -46,10 +46,11 @@ static int stmmac_release(struct net_device *dev);
 /*
  * Register/unregister, mostly the reinit task
  */
-static int stmmac_netmap_reg(struct netmap_adapter *na, int onoff)
+static int
+stmmac_netmap_reg(struct netmap_adapter *na, int onoff)
 {
 	struct ifnet *ifp = na->ifp;
-	int error = 0;
+	int error         = 0;
 
 	stmmac_release(ifp);
 
@@ -73,15 +74,16 @@ static int stmmac_netmap_reg(struct netmap_adapter *na, int onoff)
 /*
  * Reconcile kernel and user view of the transmit ring.
  */
-static int stmmac_netmap_txsync(struct netmap_kring *kring, int flags)
+static int
+stmmac_netmap_txsync(struct netmap_kring *kring, int flags)
 {
 	struct netmap_adapter *na = kring->na;
-	struct ifnet *ifp = na->ifp;
-	struct netmap_ring *ring = kring->ring;
-	u_int nm_i; /* index into the netmap ring */
+	struct ifnet *ifp         = na->ifp;
+	struct netmap_ring *ring  = kring->ring;
+	u_int nm_i;  /* index into the netmap ring */
 	u_int nic_i; /* index into the NIC ring */
 	u_int n;
-	u_int const lim = kring->nkr_num_slots - 1;
+	u_int const lim  = kring->nkr_num_slots - 1;
 	u_int const head = kring->rhead;
 
 	/* device-specific */
@@ -90,8 +92,8 @@ static int stmmac_netmap_txsync(struct netmap_kring *kring, int flags)
 	rmb();
 
 	/*
-	* First part: process new packets to send.
-	*/
+	 * First part: process new packets to send.
+	 */
 	if (!netif_carrier_ok(ifp)) {
 		goto out;
 	}
@@ -102,20 +104,21 @@ static int stmmac_netmap_txsync(struct netmap_kring *kring, int flags)
 		nic_i = netmap_idx_k2n(kring, nm_i);
 		for (n = 0; nm_i != head; n++) {
 			struct netmap_slot *slot = &ring->slot[nm_i];
-			int len = slot->len;
+			int len                  = slot->len;
 			uint64_t paddr;
+			__builtin_prefetch(&ring->slot[nm_next(nm_i, lim)]);
 			void *addr = PNMB(na, slot, &paddr);
 			uint32_t etdes1 =
-				(slot->len & ETDES1_BUFFER1_SIZE_MASK);
+			    (slot->len & ETDES1_BUFFER1_SIZE_MASK);
 			uint32_t etdes0 = ETDES0_LAST_SEGMENT | ETDES0_OWN |
-					  ETDES0_FIRST_SEGMENT;
+			                  ETDES0_FIRST_SEGMENT;
 
 			/* device-specific */
 			struct dma_desc *pdam_desc = NULL;
 			if (stmac_priv->extend_desc)
 				pdam_desc =
-					(struct dma_desc *)(stmac_priv->dma_etx +
-							    nic_i);
+				    (struct dma_desc *)(stmac_priv->dma_etx +
+				                        nic_i);
 			else
 				pdam_desc = stmac_priv->dma_tx + nic_i;
 
@@ -126,7 +129,8 @@ static int stmmac_netmap_txsync(struct netmap_kring *kring, int flags)
 
 			if (slot->flags & NS_BUF_CHANGED) {
 				/* buffer has changed, reload map */
-				// netmap_reload_map(pdev, DMA_TO_DEVICE, old_paddr, addr);
+				// netmap_reload_map(pdev, DMA_TO_DEVICE,
+				// old_paddr, addr);
 				pdam_desc->des2 = paddr;
 			}
 
@@ -134,7 +138,7 @@ static int stmmac_netmap_txsync(struct netmap_kring *kring, int flags)
 			pdam_desc->des0 = etdes0;
 			pdam_desc->des1 = etdes1;
 
-			nm_i = nm_next(nm_i, lim);
+			nm_i  = nm_next(nm_i, lim);
 			nic_i = nm_next(nic_i, lim);
 		}
 
@@ -145,16 +149,16 @@ static int stmmac_netmap_txsync(struct netmap_kring *kring, int flags)
 	}
 
 	/*
-	* Second part: reclaim buffers for completed transmissions.
-	*/
+	 * Second part: reclaim buffers for completed transmissions.
+	 */
 	if (flags & NAF_FORCE_RECLAIM || nm_kr_txempty(kring)) {
 		for (n = 0, nic_i = stmac_priv->dirty_tx;
 		     nic_i != stmac_priv->cur_tx; n++) {
 			struct dma_desc *pdam_desc = NULL;
 			if (stmac_priv->extend_desc)
 				pdam_desc =
-					(struct dma_desc *)(stmac_priv->dma_etx +
-							    nic_i);
+				    (struct dma_desc *)(stmac_priv->dma_etx +
+				                        nic_i);
 			else
 				pdam_desc = stmac_priv->dma_tx + nic_i;
 
@@ -169,7 +173,7 @@ static int stmmac_netmap_txsync(struct netmap_kring *kring, int flags)
 		if (n > 0) {
 			stmac_priv->dirty_tx = nic_i;
 			kring->nr_hwtail =
-				nm_prev(netmap_idx_n2k(kring, nic_i), lim);
+			    nm_prev(netmap_idx_n2k(kring, nic_i), lim);
 		}
 	}
 out:
@@ -180,20 +184,21 @@ out:
  * Reconcile kernel and user view of the receive ring.
  * static int stmmac_rx(struct stmmac_priv *priv, int limit)
  */
-static int stmmac_netmap_rxsync(struct netmap_kring *kring, int flags)
+static int
+stmmac_netmap_rxsync(struct netmap_kring *kring, int flags)
 {
-	struct netmap_adapter *na = kring->na;
-	struct ifnet *ifp = na->ifp;
+	struct netmap_adapter *na      = kring->na;
+	struct ifnet *ifp              = na->ifp;
 	struct stmmac_priv *stmac_priv = netdev_priv(ifp);
-	struct netmap_ring *ring = kring->ring;
-	unsigned int nm_i; /* index into the netmap ring */
+	struct netmap_ring *ring       = kring->ring;
+	unsigned int nm_i;  /* index into the netmap ring */
 	unsigned int entry; /* index into the NIC ring */
 	unsigned int n;
-	unsigned int const lim = kring->nkr_num_slots - 1;
+	unsigned int const lim  = kring->nkr_num_slots - 1;
 	unsigned int const head = kring->rhead;
 
 	int force_update =
-		(flags & NAF_FORCE_READ) || (kring->nr_kflags & NKR_PENDINTR);
+	    (flags & NAF_FORCE_READ) || (kring->nr_kflags & NKR_PENDINTR);
 
 	if (!netif_carrier_ok(ifp))
 		return 0;
@@ -204,15 +209,15 @@ static int stmmac_netmap_rxsync(struct netmap_kring *kring, int flags)
 	rmb();
 
 	/*
-	* First part: import newly received packets.
-	*/
+	 * First part: import newly received packets.
+	 */
 	if (netmap_no_pendintr || force_update) {
-		uint32_t stop_i = nm_prev(kring->nr_hwcur, lim);
-		int coe = stmac_priv->hw->rx_csum;
+		uint32_t stop_i    = nm_prev(kring->nr_hwcur, lim);
+		int coe            = stmac_priv->hw->rx_csum;
 		uint32_t frame_len = 0x0;
 
 		entry = stmac_priv->cur_rx; /* next pkt to check */
-		nm_i = netmap_idx_n2k(kring, entry);
+		nm_i  = netmap_idx_n2k(kring, entry);
 
 		while (nm_i != stop_i) {
 			int status;
@@ -220,15 +225,15 @@ static int stmmac_netmap_rxsync(struct netmap_kring *kring, int flags)
 
 			if (stmac_priv->extend_desc)
 				pdam_desc =
-					(struct dma_desc *)(stmac_priv->dma_erx +
-							    entry);
+				    (struct dma_desc *)(stmac_priv->dma_erx +
+				                        entry);
 			else
 				pdam_desc = stmac_priv->dma_rx + entry;
 
 			/* read the status of the incoming frame */
 			status = stmac_priv->hw->desc->rx_status(
-				&stmac_priv->dev->stats, &stmac_priv->xstats,
-				pdam_desc);
+			    &stmac_priv->dev->stats, &stmac_priv->xstats,
+			    pdam_desc);
 
 			/* check if managed by the DMA otherwise go ahead */
 			if (unlikely(status & dma_own))
@@ -237,12 +242,12 @@ static int stmmac_netmap_rxsync(struct netmap_kring *kring, int flags)
 			if ((stmac_priv->extend_desc) &&
 			    (stmac_priv->hw->desc->rx_extended_status))
 				stmac_priv->hw->desc->rx_extended_status(
-					&stmac_priv->dev->stats,
-					&stmac_priv->xstats,
-					stmac_priv->dma_erx + entry);
+				    &stmac_priv->dev->stats,
+				    &stmac_priv->xstats,
+				    stmac_priv->dma_erx + entry);
 
 			frame_len = stmac_priv->hw->desc->get_rx_frame_len(
-				pdam_desc, coe);
+			    pdam_desc, coe);
 
 			/* ACS is set; GMAC core strips PAD/FCS for IEEE 802.3
 			 * Type frames (LLC/LLC-SNAP)
@@ -250,10 +255,10 @@ static int stmmac_netmap_rxsync(struct netmap_kring *kring, int flags)
 			if (unlikely(status != llc_snap))
 				frame_len -= ETH_FCS_LEN;
 
-			ring->slot[nm_i].len = frame_len;
+			ring->slot[nm_i].len   = frame_len;
 			ring->slot[nm_i].flags = 0;
 
-			nm_i = nm_next(nm_i, lim);
+			nm_i  = nm_next(nm_i, lim);
 			entry = nm_next(entry, lim);
 		}
 
@@ -264,8 +269,8 @@ static int stmmac_netmap_rxsync(struct netmap_kring *kring, int flags)
 	}
 
 	/*
-	* Second part: skip past packets that userspace has released.
-	*/
+	 * Second part: skip past packets that userspace has released.
+	 */
 	nm_i = kring->nr_hwcur;
 	if (nm_i != head) {
 		entry = netmap_idx_k2n(kring, nm_i);
@@ -274,14 +279,15 @@ static int stmmac_netmap_rxsync(struct netmap_kring *kring, int flags)
 
 			struct netmap_slot *slot = &ring->slot[nm_i];
 			uint64_t paddr;
+			__builtin_prefetch(&ring->slot[nm_next(nm_i, lim)]);
 			void *addr = PNMB(na, slot, &paddr);
 
 			struct dma_desc *pdam_desc;
 
 			if (stmac_priv->extend_desc)
 				pdam_desc =
-					(struct dma_desc *)(stmac_priv->dma_erx +
-							    entry);
+				    (struct dma_desc *)(stmac_priv->dma_erx +
+				                        entry);
 			else
 				pdam_desc = stmac_priv->dma_rx + entry;
 
@@ -295,14 +301,15 @@ static int stmmac_netmap_rxsync(struct netmap_kring *kring, int flags)
 
 			if (slot->flags & NS_BUF_CHANGED) {
 				/* buffer has changed, reload map */
-				// netmap_reload_map(pdev, DMA_TO_DEVICE, old_paddr, addr);
+				// netmap_reload_map(pdev, DMA_TO_DEVICE,
+				// old_paddr, addr);
 				pdam_desc->des2 = paddr;
 				slot->flags &= ~NS_BUF_CHANGED;
 			}
 
 			pdam_desc->des1 |= erdes1;
 
-			nm_i = nm_next(nm_i, lim);
+			nm_i  = nm_next(nm_i, lim);
 			entry = nm_next(entry, lim);
 		}
 
@@ -320,10 +327,11 @@ ring_reset:
  * Make the Tx desc rings point to the netmap buffers.
  * static int init_dma_desc_rings(struct net_device *dev, gfp_t flags)
  */
-static int stmmac_netmap_tx_init(struct stmmac_priv *stmac_priv)
+static int
+stmmac_netmap_tx_init(struct stmmac_priv *stmac_priv)
 {
 	struct netmap_adapter *na = NA(stmac_priv->dev);
-	struct netmap_slot *slot = NULL;
+	struct netmap_slot *slot  = NULL;
 	int i, l;
 	uint64_t paddr = 0x0;
 
@@ -333,7 +341,7 @@ static int stmmac_netmap_tx_init(struct stmmac_priv *stmac_priv)
 
 	/* l points in the netmap ring, i points in the NIC ring */
 	for (i = 0; i < na->num_tx_desc; i++) {
-		uint32_t etdes0 = 0x0;
+		uint32_t etdes0            = 0x0;
 		struct dma_desc *pdam_desc = NULL;
 
 		stmac_priv->tx_skbuff[i] = NULL;
@@ -366,10 +374,11 @@ static int stmmac_netmap_tx_init(struct stmmac_priv *stmac_priv)
  * Make the Rx desc rings point to the netmap buffers.
  * static int init_dma_desc_rings(struct net_device *dev, gfp_t flags)
  */
-static int stmmac_netmap_rx_init(struct stmmac_priv *stmac_priv)
+static int
+stmmac_netmap_rx_init(struct stmmac_priv *stmac_priv)
 {
 	struct netmap_adapter *na = NA(stmac_priv->dev);
-	struct netmap_slot *slot = NULL;
+	struct netmap_slot *slot  = NULL;
 	int i, lim, l;
 	uint64_t paddr = 0x0;
 
@@ -380,7 +389,7 @@ static int stmmac_netmap_rx_init(struct stmmac_priv *stmac_priv)
 	lim = na->num_rx_desc - nm_kr_rxspace(na->rx_rings[0]);
 	for (i = 0; i < na->num_rx_desc; i++) {
 		void *addr;
-		uint32_t erdes1 = 0x0;
+		uint32_t erdes1            = 0x0;
 		struct dma_desc *pdam_desc = NULL;
 
 		stmac_priv->rx_skbuff[i] = NULL;
@@ -393,17 +402,18 @@ static int stmmac_netmap_rx_init(struct stmmac_priv *stmac_priv)
 		if (IS_ERR(pdam_desc))
 			return 0;
 
-		l = netmap_idx_n2k(na->rx_rings[0], i);
+		l    = netmap_idx_n2k(na->rx_rings[0], i);
 		addr = PNMB(na, slot + l, &paddr);
 
-		/* NOTE:is not set: ERDES3 and erdes1 |= ((BUF_SIZE_8KiB - 1) << ERDES1_BUFFER2_SIZE_SHIFT) & ERDES1_BUFFER2_SIZE_MASK; */
+		/* NOTE:is not set: ERDES3 and erdes1 |= ((BUF_SIZE_8KiB - 1) <<
+		 * ERDES1_BUFFER2_SIZE_SHIFT) & ERDES1_BUFFER2_SIZE_MASK; */
 
 		/* ERDES2 */
 		pdam_desc->des2 = paddr;
 
 		/* ERDES1 */
 		erdes1 |=
-			((NETMAP_BUF_SIZE(na) - 1) & ERDES1_BUFFER1_SIZE_MASK);
+		    ((NETMAP_BUF_SIZE(na) - 1) & ERDES1_BUFFER1_SIZE_MASK);
 
 		/* operate in ring mode only, and set last ERDES accordingly*/
 		if (i == na->num_rx_desc - 1) {
@@ -422,7 +432,8 @@ static int stmmac_netmap_rx_init(struct stmmac_priv *stmac_priv)
 	return 1;
 }
 
-static int stmmac_netmap_bufcfg(struct netmap_kring *kring, uint64_t target)
+static int
+stmmac_netmap_bufcfg(struct netmap_kring *kring, uint64_t target)
 {
 	kring->hwbuf_len = BUF_SIZE_8KiB;
 	kring->buf_align = 0; /* no alignment */
@@ -430,11 +441,11 @@ static int stmmac_netmap_bufcfg(struct netmap_kring *kring, uint64_t target)
 	return 0;
 }
 
-static int stmmac_netmap_config(struct netmap_adapter *na,
-				struct nm_config_info *info)
+static int
+stmmac_netmap_config(struct netmap_adapter *na, struct nm_config_info *info)
 {
 	struct stmmac_priv *stmac_priv = netdev_priv(na->ifp);
-	int ret = netmap_rings_config_get(na, info);
+	int ret                        = netmap_rings_config_get(na, info);
 
 	if (ret)
 		return ret;
@@ -444,23 +455,24 @@ static int stmmac_netmap_config(struct netmap_adapter *na,
 	return 0;
 }
 
-static void stmmac_netmap_attach(struct stmmac_priv *stmac_priv)
+static void
+stmmac_netmap_attach(struct stmmac_priv *stmac_priv)
 {
 	struct netmap_adapter na;
 
 	bzero(&na, sizeof(na));
 
-	na.ifp = stmac_priv->dev; /* struct net_device *dev; */
-	na.pdev = &stmac_priv->device; /* struct device *device; */
-	na.num_tx_desc = DMA_TX_SIZE;
-	na.num_rx_desc = DMA_RX_SIZE;
+	na.ifp            = stmac_priv->dev;     /* struct net_device *dev; */
+	na.pdev           = &stmac_priv->device; /* struct device *device; */
+	na.num_tx_desc    = DMA_TX_SIZE;
+	na.num_rx_desc    = DMA_RX_SIZE;
 	na.rx_buf_maxsize = BUF_SIZE_8KiB;
 	na.num_tx_rings = na.num_rx_rings = 1;
-	na.nm_txsync = stmmac_netmap_txsync;
-	na.nm_rxsync = stmmac_netmap_rxsync;
-	na.nm_register = stmmac_netmap_reg;
-	na.nm_config = stmmac_netmap_config;
-	na.nm_bufcfg = stmmac_netmap_bufcfg;
+	na.nm_txsync                      = stmmac_netmap_txsync;
+	na.nm_rxsync                      = stmmac_netmap_rxsync;
+	na.nm_register                    = stmmac_netmap_reg;
+	na.nm_config                      = stmmac_netmap_config;
+	na.nm_bufcfg                      = stmmac_netmap_bufcfg;
 	netmap_attach(&na);
 }
 

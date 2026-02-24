@@ -10,7 +10,7 @@
 #include <net/netmap.h>
 #include <netmap/netmap_kern.h>
 
-#define SOFTC_T	igc_adapter
+#define SOFTC_T igc_adapter
 #ifndef IGC_SRRCTL_BSIZEPKT_SHIFT
 #define IGC_SRRCTL_BSIZEPKT_SHIFT 10
 #endif /* IGC_SRRCTL_BSIZEPKT_SHIFT */
@@ -25,7 +25,7 @@ char netmap_igc_driver_name[] = "igc" NETMAP_LINUX_DRIVER_SUFFIX;
 static int
 igc_netmap_reg(struct netmap_adapter *na, int onoff)
 {
-	struct ifnet *ifp = na->ifp;
+	struct ifnet *ifp       = na->ifp;
 	struct SOFTC_T *adapter = netdev_priv(ifp);
 
 	/* protect against other reinit */
@@ -51,8 +51,8 @@ igc_netmap_reg(struct netmap_adapter *na, int onoff)
 	return (0);
 }
 
-static inline void NM_WRITE_SRRCTL(struct igc_adapter *adapter,
-	struct igc_ring *rxr, u32 srrctl)
+static inline void
+NM_WRITE_SRRCTL(struct igc_adapter *adapter, struct igc_ring *rxr, u32 srrctl)
 {
 	struct igc_hw *hw = &adapter->hw;
 	wr32(IGC_SRRCTL(rxr->reg_idx), srrctl);
@@ -61,8 +61,8 @@ static inline void NM_WRITE_SRRCTL(struct igc_adapter *adapter,
 static void
 igc_netmap_configure_srrctl(struct igc_ring *rxr)
 {
-	struct ifnet *ifp = rxr->netdev;
-	struct netmap_adapter* na = NA(ifp);
+	struct ifnet *ifp           = rxr->netdev;
+	struct netmap_adapter *na   = NA(ifp);
 	struct igc_adapter *adapter = netdev_priv(ifp);
 	u32 srrctl;
 
@@ -76,16 +76,16 @@ igc_netmap_configure_srrctl(struct igc_ring *rxr)
 static int
 igc_netmap_configure_rx_ring(struct igc_ring *rxr)
 {
-	struct ifnet *ifp = rxr->netdev;
-	struct netmap_adapter* na = NA(ifp);
-	int reg_idx = rxr->reg_idx;
-	struct netmap_slot* slot;
+	struct ifnet *ifp         = rxr->netdev;
+	struct netmap_adapter *na = NA(ifp);
+	int reg_idx               = rxr->reg_idx;
+	struct netmap_slot *slot;
 	struct netmap_kring *kring;
 	u_int i, n;
 
 	slot = netmap_reset(na, NR_RX, reg_idx, 0);
 	if (!slot)
-		return 0;       // not in native netmap mode
+		return 0; // not in native netmap mode
 
 	igc_netmap_configure_srrctl(rxr);
 
@@ -98,24 +98,24 @@ igc_netmap_configure_rx_ring(struct igc_ring *rxr)
 		uint64_t paddr;
 		int si = netmap_idx_n2k(kring, i);
 		PNMB(na, slot + si, &paddr);
-		rx_desc = IGC_RX_DESC(rxr, i);
+		rx_desc                = IGC_RX_DESC(rxr, i);
 		rx_desc->read.hdr_addr = 0;
 		rx_desc->read.pkt_addr = htole64(paddr);
 	}
 
-	wmb();  /* Force memory writes to complete */
+	wmb(); /* Force memory writes to complete */
 	nm_prdis("%s rxr%d.tail %d", na->name, reg_idx, i);
 	writel(n, rxr->tail);
 
-	return 1;      // success
+	return 1; // success
 }
 
 static int
 igc_netmap_configure_tx_ring(struct SOFTC_T *adapter, int ring_nr)
 {
-	struct ifnet *ifp = adapter->netdev;
-	struct netmap_adapter* na = NA(ifp);
-	struct netmap_slot* slot;
+	struct ifnet *ifp         = adapter->netdev;
+	struct netmap_adapter *na = NA(ifp);
+	struct netmap_slot *slot;
 	struct igc_ring *txr = adapter->tx_ring[ring_nr];
 	int i, si;
 	void *addr;
@@ -123,18 +123,18 @@ igc_netmap_configure_tx_ring(struct SOFTC_T *adapter, int ring_nr)
 
 	slot = netmap_reset(na, NR_TX, ring_nr, 0);
 	if (!slot)
-		return 0;  // not in netmap native mode
+		return 0; // not in netmap native mode
 
 	for (i = 0; i < na->num_tx_desc; i++) {
 		union igc_adv_tx_desc *tx_desc;
-		si = netmap_idx_n2k(na->tx_rings[ring_nr], i);
-		addr = PNMB(na, slot + si, &paddr);
+		si      = netmap_idx_n2k(na->tx_rings[ring_nr], i);
+		addr    = PNMB(na, slot + si, &paddr);
 		tx_desc = IGC_TX_DESC(txr, i);
 		tx_desc->read.buffer_addr = htole64(paddr);
 		/* actually we don't care to init the rings here */
 	}
 
-	return 1;       // success
+	return 1; // success
 }
 
 /*
@@ -144,122 +144,133 @@ static int
 igc_netmap_txsync(struct netmap_kring *kring, int flags)
 {
 	struct netmap_adapter *na = kring->na;
-	struct ifnet *ifp = na->ifp;
-	struct netmap_ring *ring = kring->ring;
-	u_int ring_nr = kring->ring_id;
-	u_int nm_i;     /* index into the netmap ring */
-	u_int nic_i;    /* index into the NIC ring */
+	struct ifnet *ifp         = na->ifp;
+	struct netmap_ring *ring  = kring->ring;
+	u_int ring_nr             = kring->ring_id;
+	u_int nm_i;  /* index into the netmap ring */
+	u_int nic_i; /* index into the NIC ring */
 	u_int n;
-	u_int const lim = kring->nkr_num_slots - 1;
+	u_int const lim  = kring->nkr_num_slots - 1;
 	u_int const head = kring->rhead;
 	/* generate an interrupt approximately every half ring */
 	u_int report_frequency = kring->nkr_num_slots >> 1, report;
 
 	/* device-specific */
 	struct SOFTC_T *adapter = netdev_priv(ifp);
-		struct igc_ring* txr = adapter->tx_ring[ring_nr];
+	struct igc_ring *txr    = adapter->tx_ring[ring_nr];
 
-		if (!netif_carrier_ok(ifp) || !netif_device_present(ifp)) {
-			goto out;
-		}
+	if (!netif_carrier_ok(ifp) || !netif_device_present(ifp)) {
+		goto out;
+	}
 
-		/*
-		 * First part: process new packets to send.
-		 */
-		nm_i = kring->nr_hwcur;
-		if (nm_i != head) {     /* we have new packets to send */
-			unsigned int total_packets = 0, total_bytes = 0;
-			nic_i = netmap_idx_k2n(kring, nm_i);
-			for (n = 0; nm_i != head; n++) {
-				struct netmap_slot *slot = &ring->slot[nm_i];
-				u_int len = slot->len;
-				uint64_t paddr;
-				__le32 cmd_type = 0;
-				uint32_t olinfo_status=0;
-				void *addr = PNMB(na, slot, &paddr);
+	/*
+	 * First part: process new packets to send.
+	 */
+	nm_i = kring->nr_hwcur;
+	if (nm_i != head) { /* we have new packets to send */
+		unsigned int total_packets = 0, total_bytes = 0;
+		nic_i = netmap_idx_k2n(kring, nm_i);
+		for (n = 0; nm_i != head; n++) {
+			struct netmap_slot *slot = &ring->slot[nm_i];
+			u_int len                = slot->len;
+			uint64_t paddr;
+			__le32 cmd_type        = 0;
+			uint32_t olinfo_status = 0;
+			__builtin_prefetch(&ring->slot[nm_next(nm_i, lim)]);
+			void *addr = PNMB(na, slot, &paddr);
 
-				/* device-specific */
-				union igc_adv_tx_desc *curr =
-					IGC_TX_DESC(txr, nic_i);
-				int hw_flags = IGC_ADVTXD_DTYP_DATA | IGC_ADVTXD_DCMD_DEXT |
-						IGC_ADVTXD_DCMD_IFCS;
-				u_int totlen = len;
+			/* device-specific */
+			union igc_adv_tx_desc *curr = IGC_TX_DESC(txr, nic_i);
+			int hw_flags                = IGC_ADVTXD_DTYP_DATA |
+			               IGC_ADVTXD_DCMD_DEXT |
+			               IGC_ADVTXD_DCMD_IFCS;
+			u_int totlen = len;
 
-				NM_CHECK_ADDR_LEN(na, addr, len);
+			NM_CHECK_ADDR_LEN(na, addr, len);
 
-				report = slot->flags & NS_REPORT ||
-					nic_i == 0 ||
-					nic_i == report_frequency;
-				total_packets++;
-				total_bytes += len;
+			report = slot->flags & NS_REPORT || nic_i == 0 ||
+			         nic_i == report_frequency;
+			total_packets++;
+			total_bytes += len;
 
-				if (slot->flags & NS_MOREFRAG) {
-					/* There is some duplicated code here, but
-					 * mixing everything up in the outer loop makes
-					 * things less transparent, and it also adds
-					 * unnecessary instructions in the fast path
-					 */
-					union igc_adv_tx_desc *first = curr;
-					first->read.buffer_addr = htole64(paddr);
-					first->read.cmd_type_len = htole32(len | hw_flags);
-					netmap_sync_map_dev(na, (bus_dma_tag_t) na->pdev,
-							&paddr, len, NR_TX);
-					/* avoid setting the FCS flag in the
-					 * descriptors after the first, for safety
-					 */
-					hw_flags &= ~IGC_ADVTXD_DCMD_IFCS;
-					for (;;) {
-						nm_i = nm_next(nm_i, lim);
-						nic_i = nm_next(nic_i, lim);
-						/* remember that we have to ask for a
-						 * report each time we move past half a
-						 * ring
-						 */
-						report |= nic_i == 0 ||
-							nic_i == report_frequency;
-						if (nm_i == head) {
-							// XXX should we accept incomplete packets?
-							return EINVAL;
-						}
-						slot = &ring->slot[nm_i];
-						len = slot->len;
-						addr = PNMB(na, slot, &paddr);
-						NM_CHECK_ADDR_LEN(na, addr, len);
-						curr = IGC_TX_DESC(txr, nic_i);
-						totlen += len;
-						total_packets++;
-						total_bytes += len;
-						if (!(slot->flags & NS_MOREFRAG))
-							break;
-						curr->read.buffer_addr = htole64(paddr);
-						curr->read.olinfo_status = 0;
-						curr->read.cmd_type_len = htole32(len | hw_flags);
-						netmap_sync_map_dev(na, (bus_dma_tag_t) na->pdev,
-								&paddr, len, NR_TX);
-					}
-					first->read.olinfo_status =
-							htole32(totlen << IGC_ADVTXD_PAYLEN_SHIFT);
-					totlen = 0;
-				}
-				/* curr now always points to the last descriptor of a packet
-				 * (which is also the first for single-slot packets)
-				 *
-				 * EOP and RS must be set only in this descriptor.
+			if (slot->flags & NS_MOREFRAG) {
+				/* There is some duplicated code here, but
+				 * mixing everything up in the outer loop makes
+				 * things less transparent, and it also adds
+				 * unnecessary instructions in the fast path
 				 */
-				hw_flags |= IGC_ADVTXD_DCMD_EOP | (report ? IGC_ADVTXD_DCMD_RS : 0);
-				slot->flags &= ~(NS_REPORT | NS_BUF_CHANGED | NS_MOREFRAG);
-
-				/* Fill the slot in the NIC ring. */
-				curr->read.buffer_addr = htole64(paddr);
-				curr->read.olinfo_status = htole32(olinfo_status | (totlen << IGC_ADVTXD_PAYLEN_SHIFT));
-				curr->read.cmd_type_len = cmd_type | htole32(len | hw_flags);
-				netmap_sync_map_dev(na, (bus_dma_tag_t) na->pdev, &paddr, len, NR_TX);
-				nm_i = nm_next(nm_i, lim);
-				nic_i = nm_next(nic_i, lim);
+				union igc_adv_tx_desc *first = curr;
+				first->read.buffer_addr      = htole64(paddr);
+				first->read.cmd_type_len =
+				    htole32(len | hw_flags);
+				netmap_sync_map_dev(na, (bus_dma_tag_t)na->pdev,
+				                    &paddr, len, NR_TX);
+				/* avoid setting the FCS flag in the
+				 * descriptors after the first, for safety
+				 */
+				hw_flags &= ~IGC_ADVTXD_DCMD_IFCS;
+				for (;;) {
+					nm_i  = nm_next(nm_i, lim);
+					nic_i = nm_next(nic_i, lim);
+					/* remember that we have to ask for a
+					 * report each time we move past half a
+					 * ring
+					 */
+					report |= nic_i == 0 ||
+					          nic_i == report_frequency;
+					if (nm_i == head) {
+						// XXX should we accept
+						// incomplete packets?
+						return EINVAL;
+					}
+					slot = &ring->slot[nm_i];
+					len  = slot->len;
+					addr = PNMB(na, slot, &paddr);
+					NM_CHECK_ADDR_LEN(na, addr, len);
+					curr = IGC_TX_DESC(txr, nic_i);
+					totlen += len;
+					total_packets++;
+					total_bytes += len;
+					if (!(slot->flags & NS_MOREFRAG))
+						break;
+					curr->read.buffer_addr = htole64(paddr);
+					curr->read.olinfo_status = 0;
+					curr->read.cmd_type_len =
+					    htole32(len | hw_flags);
+					netmap_sync_map_dev(
+					    na, (bus_dma_tag_t)na->pdev, &paddr,
+					    len, NR_TX);
+				}
+				first->read.olinfo_status =
+				    htole32(totlen << IGC_ADVTXD_PAYLEN_SHIFT);
+				totlen = 0;
 			}
+			/* curr now always points to the last descriptor of a
+			 * packet (which is also the first for single-slot
+			 * packets)
+			 *
+			 * EOP and RS must be set only in this descriptor.
+			 */
+			hw_flags |= IGC_ADVTXD_DCMD_EOP |
+			            (report ? IGC_ADVTXD_DCMD_RS : 0);
+			slot->flags &=
+			    ~(NS_REPORT | NS_BUF_CHANGED | NS_MOREFRAG);
+
+			/* Fill the slot in the NIC ring. */
+			curr->read.buffer_addr = htole64(paddr);
+			curr->read.olinfo_status =
+			    htole32(olinfo_status |
+			            (totlen << IGC_ADVTXD_PAYLEN_SHIFT));
+			curr->read.cmd_type_len =
+			    cmd_type | htole32(len | hw_flags);
+			netmap_sync_map_dev(na, (bus_dma_tag_t)na->pdev, &paddr,
+			                    len, NR_TX);
+			nm_i  = nm_next(nm_i, lim);
+			nic_i = nm_next(nic_i, lim);
+		}
 		kring->nr_hwcur = head;
 
-		wmb();  /* synchronize writes to the NIC ring */
+		wmb(); /* synchronize writes to the NIC ring */
 
 		/* (re)start the tx unit up to slot nic_i (excluded) */
 		writel(nic_i, txr->tail);
@@ -281,16 +292,16 @@ igc_netmap_txsync(struct netmap_kring *kring, int flags)
 			nm_prdis("TDH wrap %d", nic_i);
 			nic_i -= kring->nkr_num_slots;
 		}
-		nm_i = netmap_idx_n2k(kring, nic_i);
+		nm_i   = netmap_idx_n2k(kring, nic_i);
 		tosync = nm_next(kring->nr_hwtail, lim);
 		/* sync all buffers that we are returning to userspace */
-		for ( ; tosync != nm_i; tosync = nm_next(tosync, lim)) {
+		for (; tosync != nm_i; tosync = nm_next(tosync, lim)) {
 			struct netmap_slot *slot = &ring->slot[tosync];
 			uint64_t paddr;
 			(void)PNMB(na, slot, &paddr);
 
-			netmap_sync_map_cpu(na, (bus_dma_tag_t) na->pdev,
-					&paddr, slot->len, NR_TX);
+			netmap_sync_map_cpu(na, (bus_dma_tag_t)na->pdev, &paddr,
+			                    slot->len, NR_TX);
 		}
 		kring->nr_hwtail = nm_prev(nm_i, lim);
 	}
@@ -305,25 +316,27 @@ static int
 igc_netmap_rxsync(struct netmap_kring *kring, int flags)
 {
 	struct netmap_adapter *na = kring->na;
-	struct ifnet *ifp = na->ifp;
-	struct netmap_ring *ring = kring->ring;
-	u_int ring_nr = kring->ring_id;
-	u_int nm_i;     /* index into the netmap ring */
-	u_int nic_i;    /* index into the NIC ring */
+	struct ifnet *ifp         = na->ifp;
+	struct netmap_ring *ring  = kring->ring;
+	u_int ring_nr             = kring->ring_id;
+	u_int nm_i;  /* index into the netmap ring */
+	u_int nic_i; /* index into the NIC ring */
 	u_int n;
-	u_int const lim = kring->nkr_num_slots - 1;
+	u_int const lim  = kring->nkr_num_slots - 1;
 	u_int const head = kring->rhead;
-	int force_update = (flags & NAF_FORCE_READ) || (kring->nr_kflags & NKR_PENDINTR);
+	int force_update =
+	    (flags & NAF_FORCE_READ) || (kring->nr_kflags & NKR_PENDINTR);
 
 	/* device-specific */
 	struct SOFTC_T *adapter = netdev_priv(ifp);
-	struct igc_ring *rxr = adapter->rx_ring[ring_nr];
+	struct igc_ring *rxr    = adapter->rx_ring[ring_nr];
 
 	if (!netif_carrier_ok(ifp) || !netif_device_present(ifp))
 		return 0;
 
 	if (head > lim) {
-		nm_prlim(10, " rxsync lim %d head %d kring %p", lim, head, kring);
+		nm_prlim(10, " rxsync lim %d head %d kring %p", lim, head,
+		         kring);
 		return netmap_ring_reinit(kring);
 	}
 
@@ -334,16 +347,18 @@ igc_netmap_rxsync(struct netmap_kring *kring, int flags)
 	if (netmap_no_pendintr || force_update) {
 		unsigned int total_packets = 0, total_bytes = 0;
 		u_int new_hwtail = (u_int)-1;
-		nic_i = rxr->next_to_clean;
-		nm_i = netmap_idx_n2k(kring, nic_i);
+		nic_i            = rxr->next_to_clean;
+		nm_i             = netmap_idx_n2k(kring, nic_i);
 
-		for (n = 0; ; n++) {
-			union igc_adv_rx_desc *curr =
-				IGC_RX_DESC(rxr, nic_i);
+		for (n = 0;; n++) {
+			union igc_adv_rx_desc *curr = IGC_RX_DESC(rxr, nic_i);
 			uint32_t size = le16_to_cpu(curr->wb.upper.length);
 			struct netmap_slot *slot = &ring->slot[nm_i];
 			uint64_t paddr;
 			int complete;
+			__builtin_prefetch(&ring->slot[nm_next(nm_i, lim)]);
+			__builtin_prefetch(
+			    IGC_RX_DESC(rxr, nm_next(nic_i, lim)));
 
 			if (!size)
 				break;
@@ -351,13 +366,14 @@ igc_netmap_rxsync(struct netmap_kring *kring, int flags)
 			dma_rmb();
 
 			PNMB(na, slot, &paddr);
-			slot->len = size;
-			complete = igc_test_staterr(curr, IGC_RXD_STAT_EOP);
+			slot->len   = size;
+			complete    = igc_test_staterr(curr, IGC_RXD_STAT_EOP);
 			slot->flags = complete ? 0 : NS_MOREFRAG;
 			total_packets++;
 			total_bytes += slot->len;
-			netmap_sync_map_cpu(na, (bus_dma_tag_t) na->pdev, &paddr, slot->len, NR_RX);
-			nm_i = nm_next(nm_i, lim);
+			netmap_sync_map_cpu(na, (bus_dma_tag_t)na->pdev, &paddr,
+			                    slot->len, NR_RX);
+			nm_i  = nm_next(nm_i, lim);
 			nic_i = nm_next(nic_i, lim);
 
 			if (complete)
@@ -384,7 +400,8 @@ igc_netmap_rxsync(struct netmap_kring *kring, int flags)
 		for (n = 0; nm_i != head; n++) {
 			struct netmap_slot *slot = &ring->slot[nm_i];
 			uint64_t paddr;
-			void *addr = PNMB(na, slot, &paddr);
+			__builtin_prefetch(&ring->slot[nm_next(nm_i, lim)]);
+			void *addr                  = PNMB(na, slot, &paddr);
 			union igc_adv_rx_desc *curr = IGC_RX_DESC(rxr, nic_i);
 
 			if (addr == NETMAP_BUF_BASE(na)) /* bad buf */
@@ -393,12 +410,12 @@ igc_netmap_rxsync(struct netmap_kring *kring, int flags)
 			if (slot->flags & NS_BUF_CHANGED) {
 				slot->flags &= ~NS_BUF_CHANGED;
 			}
-			netmap_sync_map_dev(na, (bus_dma_tag_t) na->pdev,
-				&paddr, NETMAP_BUF_SIZE(na), NR_RX);
+			netmap_sync_map_dev(na, (bus_dma_tag_t)na->pdev, &paddr,
+			                    NETMAP_BUF_SIZE(na), NR_RX);
 			curr->read.pkt_addr = htole64(paddr);
 			curr->read.hdr_addr = 0;
-			nm_i = nm_next(nm_i, lim);
-			nic_i = nm_next(nic_i, lim);
+			nm_i                = nm_next(nm_i, lim);
+			nic_i               = nm_next(nic_i, lim);
 		}
 		kring->nr_hwcur = head;
 		wmb();
@@ -437,18 +454,18 @@ igc_netmap_attach(struct SOFTC_T *adapter)
 
 	bzero(&na, sizeof(na));
 
-	na.ifp = adapter->netdev;
-	na.pdev = &adapter->pdev->dev;
-	na.na_flags = NAF_MOREFRAG;
-	na.num_tx_desc = adapter->tx_ring_count;
-	na.num_rx_desc = adapter->rx_ring_count;
-	na.num_tx_rings = adapter->num_tx_queues;
-	na.num_rx_rings = adapter->num_rx_queues;
+	na.ifp            = adapter->netdev;
+	na.pdev           = &adapter->pdev->dev;
+	na.na_flags       = NAF_MOREFRAG;
+	na.num_tx_desc    = adapter->tx_ring_count;
+	na.num_rx_desc    = adapter->rx_ring_count;
+	na.num_tx_rings   = adapter->num_tx_queues;
+	na.num_rx_rings   = adapter->num_rx_queues;
 	na.rx_buf_maxsize = 1500; /* will be overwritten by config */
-	na.nm_register = igc_netmap_reg;
-	na.nm_txsync = igc_netmap_txsync;
-	na.nm_rxsync = igc_netmap_rxsync;
-	na.nm_config = igc_netmap_config;
+	na.nm_register    = igc_netmap_reg;
+	na.nm_txsync      = igc_netmap_txsync;
+	na.nm_rxsync      = igc_netmap_rxsync;
+	na.nm_config      = igc_netmap_config;
 	netmap_attach(&na);
 }
 

@@ -72,6 +72,18 @@ codebases are mostly aligned.
 - Fixed ax25 pointer safety check
 - Fixed regression in build-tests for internal drivers
 
+### Performance Optimizations
+- **`__builtin_prefetch` in all driver txsync/rxsync loops** — prefetch next netmap slot
+  and NIC descriptor in every hot loop. Applied to: ixgbe, igb, mlx5, e1000, e1000e, igc,
+  re (Realtek), forcedeth (nVidia), stmmac (ARM), virtio-net, vmxnet3. (ice/i40e already had it)
+- **Generic mode prefetch** — added prefetch in `netmap_generic.c` txsync and rxsync loops
+  (benefits every NIC using emulated netmap mode)
+- **VALE switch prefetch** — prefetch next destination slot in `nm_vale_flush()` inner copy loop
+- **`NM_KRING_ALIGNMENT`** 64 → 128 bytes — eliminates false sharing on modern CPUs
+- **`pkt_copy()` memcpy threshold** 1024 → 256 bytes — leverages kernel AVX/ERMS for larger packets
+- **`NM_BDG_HASH`** 1024 → 4096 — reduces VALE forwarding hash collisions by 4×
+- **`NM_BDG_BATCH`** 1024 → 2048 — doubles VALE batch processing window, fewer flush passes
+
 ### Build System
 - Use `ccflags-y` instead of `EXTRA_CFLAGS`
 - More precise test for `HRTIMER_MODE_REL`
